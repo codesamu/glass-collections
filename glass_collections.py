@@ -2,20 +2,21 @@ import sys
 import os
 import matplotlib.pyplot as plt
 from PyQt6.QtWidgets import QApplication, QLabel, QWidget
-from PyQt6.QtGui import QPixmap
+from PyQt6.QtGui import QPixmap, QScreen
 from PyQt6.QtCore import Qt
 import io
-import keyboard  # pip install keyboard
+import keyboard
 
-# Use matplotlib's internal mathtext (no LaTeX installation needed)
+# Use matplotlib internal mathtext (no LaTeX installation)
 from matplotlib import rc
 rc('text', usetex=False)
 
 class LatexOverlay(QWidget):
-    def __init__(self, pages):
+    def __init__(self, pages, text_color="#f6f6f6"):  # Default white
         super().__init__()
         self.pages = pages
         self.index = 0
+        self.text_color = text_color  # <-- Accept hex color code
 
         # Overlay window flags
         self.setWindowFlags(
@@ -25,12 +26,23 @@ class LatexOverlay(QWidget):
             Qt.WindowType.WindowTransparentForInput  # Click-Through
         )
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
-        self.resize(600, 300)
 
-        # Label to display LaTeX image
+        # Window size
+        self.width = 400
+        self.height = 150
+        self.resize(self.width, self.height)
+
+        # Position at bottom-right corner
+        screen: QScreen = QApplication.primaryScreen()
+        screen_geometry = screen.geometry()
+        x = screen_geometry.width() - self.width - 20  # 20 px margin from right
+        y = screen_geometry.height() - self.height - 40 # 40 px margin from bottom
+        self.move(x, y)
+
+        # Label for LaTeX image
         self.label = QLabel(self)
         self.label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.label.resize(600, 300)
+        self.label.resize(self.width, self.height)
 
         # Initial display
         self.update_page()
@@ -38,17 +50,17 @@ class LatexOverlay(QWidget):
         # Global hotkeys
         keyboard.add_hotkey("right", self.next_page)
         keyboard.add_hotkey("left", self.prev_page)
-        keyboard.add_hotkey("ctrl+alt+e", self.shutdown_program)
+        keyboard.add_hotkey("esc", self.shutdown_program)
 
     def render_latex(self, latex_str):
-        """Render LaTeX string to a QPixmap with white text"""
-        fig, ax = plt.subplots()
-        fig.patch.set_alpha(0.0)  # Transparent figure background
+        """Render LaTeX string to a QPixmap with the given color (hex or name)"""
+        fig, ax = plt.subplots(figsize=(self.width/100, self.height/100), dpi=100)
+        fig.patch.set_alpha(0.0)  # Transparent background
         ax.axis('off')
-        ax.text(0.5, 0.5, f"${latex_str}$", fontsize=32,
-                ha='center', va='center', color='white')  # <-- White text
+        ax.text(0.5, 0.5, f"${latex_str}$", fontsize=24,
+                ha='center', va='center', color=self.text_color)
         buf = io.BytesIO()
-        plt.savefig(buf, format='png', dpi=150, bbox_inches='tight', transparent=True)
+        plt.savefig(buf, format='png', dpi=100, bbox_inches='tight', transparent=True)
         plt.close(fig)
         buf.seek(0)
         pix = QPixmap()
@@ -80,6 +92,6 @@ pages = [
 ]
 
 app = QApplication(sys.argv)
-overlay = LatexOverlay(pages)
+overlay = LatexOverlay(pages, text_color="#f6f6f6")  # <-- Hex color here
 overlay.show()
 sys.exit(app.exec())
